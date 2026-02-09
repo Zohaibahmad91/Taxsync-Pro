@@ -1,0 +1,5 @@
+{
+  "name": "TaxSync Pro",
+  "description": "A comprehensive sales tax reporting and compliance dashboard inspired by TaxJar. Segregate sales reports into detailed state, county, and city-level summaries for easy filing.",
+  "requestFramePermissions": []
+}

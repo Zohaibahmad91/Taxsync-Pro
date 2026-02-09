@@ -20,27 +20,29 @@ export async function processSalesData(
     contents: {
       parts: [
         {
-          text: `You are a Senior Sales Tax Compliance Expert with deep knowledge of US state, county, and local tax jurisdictions.
+          text: `You are a World-Class Sales Tax Compliance Expert. 
           
-          TASK:
-          Process the attached sales data into a structured tax report.
+          CORE COMPETENCY:
+          - You know every US State, County, and Local Tax Jurisdiction.
+          - You understand the 'Shipping region' mapping for Shopify/Amazon reports.
+          - You possess an internal database of Jurisdiction Codes (e.g., SST codes, State-specific IDs like CA's 3-digit codes, TX Local Codes).
+
+          CRITICAL TASK - DATA ENRICHMENT:
+          1. INFER MISSING COUNTIES: If the uploaded data lacks a 'County' or 'Jurisdiction' column, you MUST automatically determine the correct County based on the 'City', 'State', and 'Zip' provided. DO NOT leave the county field blank or 'Unknown'.
+          2. JURISDICTION CODES: For every level (State, County, City), identify and include the official Filing Jurisdiction Code. This is vital for the user to file on state portals.
           
-          ADVANCED MAPPING & INFERENCE:
-          1. AUTOMATIC COUNTY ASSIGNMENT: If the input data lacks a "County" column, you MUST use your knowledge of US geography to determine the correct County based on the "City" and "State" (and "Zip" if available).
-          2. JURISDICTION CODES: Provide official tax jurisdiction codes where possible (e.g., California's 3-digit county/city codes, Texas local codes, etc.).
-          3. DATA MAPPING:
-             - "Shipping region" or "Region" => State
-             - "Shipping city" or "City" => City
-             - "Net sales" or "Amount" => Taxable & Gross Sales
-             - "Taxes" => Tax Collected
+          DATA MAPPING:
+          - "Shipping region" / "Province" => State
+          - "Shipping city" / "City" => City
+          - "Net sales" / "Total" => Taxable & Gross Sales
+          - "Taxes" / "Tax collected" => Tax Collected
           
-          PROCESSING RULES:
-          - Aggregate all individual transactions into jurisdiction totals.
-          - Hierarchy: State -> County -> City.
-          - Ensure totalTaxLiability = totalTaxCollected.
-          - Identify the report period if mentioned (e.g. "Oct 2023").
+          OUTPUT STRUCTURE:
+          - Aggregate all sales.
+          - State > County > City hierarchy.
+          - Ensure math is perfect: State Total = Sum of Counties = Sum of Cities.
           
-          OUTPUT: Return JSON following the strict schema provided.`
+          Return ONLY a clean JSON object following the provided schema.`
         },
         part
       ]
@@ -170,7 +172,7 @@ export async function processSalesData(
     return transformedReport;
   } catch (err) {
     console.error("Gemini Response parsing error:", err, response.text);
-    throw new Error("Unable to parse tax report. Ensure your file has valid sales data with identifiable cities and states.");
+    throw new Error("Tax Audit Failed. The report structure was invalid. Please ensure headers like 'Shipping City' and 'Gross Sales' are present.");
   }
 }
 

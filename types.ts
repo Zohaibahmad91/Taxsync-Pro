@@ -18,6 +18,7 @@ export interface JurisdictionSummary {
   taxCollected: number;
   taxLiability: number; // calculated
   jurisdictionCode?: string; // Added for official tax filing codes
+  taxRate?: number; // Added for granular tax rate reporting
 }
 
 export interface StateSummary extends JurisdictionSummary {

@@ -29,21 +29,20 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
 
   const getExportData = () => {
     const rows = [
-      ['State', 'County', 'City', 'Jurisdiction Code', 'Gross Sales', 'Taxable Sales', 'Tax Collected', 'Liability']
+      ['State', 'County', 'City', 'Jurisdiction Code', 'Tax Rate', 'Gross Sales', 'Taxable Sales', 'Tax Collected', 'Liability']
     ];
 
-    // Explicitly typing 'state', 'county', and 'city' to avoid 'unknown' type errors during Object.values iteration
     Object.values(report.states).forEach((state: StateSummary) => {
-      rows.push([state.name, '', '', state.jurisdictionCode || '', state.grossSales.toString(), state.taxableSales.toString(), state.taxCollected.toString(), state.taxLiability.toString()]);
+      rows.push([state.name, '', '', state.jurisdictionCode || '', state.taxRate ? `${state.taxRate}%` : '', state.grossSales.toString(), state.taxableSales.toString(), state.taxCollected.toString(), state.taxLiability.toString()]);
       Object.values(state.counties).forEach((county: CountySummary) => {
-        rows.push([state.name, county.name, '', county.jurisdictionCode || '', county.grossSales.toString(), county.taxableSales.toString(), county.taxCollected.toString(), county.taxLiability.toString()]);
+        rows.push([state.name, county.name, '', county.jurisdictionCode || '', county.taxRate ? `${county.taxRate}%` : '', county.grossSales.toString(), county.taxableSales.toString(), county.taxCollected.toString(), county.taxLiability.toString()]);
         Object.values(county.cities).forEach((city: JurisdictionSummary) => {
-          rows.push([state.name, county.name, city.name, city.jurisdictionCode || '', city.grossSales.toString(), city.taxableSales.toString(), city.taxCollected.toString(), city.taxLiability.toString()]);
+          rows.push([state.name, county.name, city.name, city.jurisdictionCode || '', city.taxRate ? `${city.taxRate}%` : '', city.grossSales.toString(), city.taxableSales.toString(), city.taxCollected.toString(), city.taxLiability.toString()]);
         });
       });
     });
 
-    rows.push(['TOTAL', '', '', '', report.totalGrossSales.toString(), report.totalTaxableSales.toString(), report.totalTaxCollected.toString(), report.totalTaxLiability.toString()]);
+    rows.push(['TOTAL', '', '', '', '', report.totalGrossSales.toString(), report.totalTaxableSales.toString(), report.totalTaxCollected.toString(), report.totalTaxLiability.toString()]);
     return rows;
   };
 
@@ -98,7 +97,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Sales Tax Summary Report</h2>
-          <p className="text-gray-500 text-sm italic">Counties automatically inferred from cities. Official jurisdiction codes included.</p>
+          <p className="text-gray-500 text-sm italic">Detailed breakdown including Tax Rates and inferred jurisdictions.</p>
         </div>
         <div className="flex items-center space-x-3 relative">
           <button 
@@ -154,6 +153,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jurisdiction</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Rate</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Gross Sales</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Taxable Sales</th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Tax Collected</th>
@@ -172,6 +172,11 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-left font-mono text-xs text-gray-400">{state.jurisdictionCode || '-'}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        {state.taxRate ? `${state.taxRate}%` : '-'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-right font-medium">${state.grossSales.toLocaleString()}</td>
                     <td className="px-6 py-4 text-right font-medium">${state.taxableSales.toLocaleString()}</td>
                     <td className="px-6 py-4 text-right font-bold text-blue-600">${state.taxCollected.toLocaleString()}</td>
@@ -192,6 +197,11 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
                           </div>
                         </td>
                         <td className="px-6 py-3 text-left font-mono text-xs text-blue-400">{county.jurisdictionCode || '-'}</td>
+                        <td className="px-6 py-3 text-center">
+                          <span className="text-xs font-medium text-blue-600">
+                            {county.taxRate ? `${county.taxRate}%` : '-'}
+                          </span>
+                        </td>
                         <td className="px-6 py-3 text-right text-gray-600">${county.grossSales.toLocaleString()}</td>
                         <td className="px-6 py-3 text-right text-gray-600">${county.taxableSales.toLocaleString()}</td>
                         <td className="px-6 py-3 text-right font-semibold text-blue-500">${county.taxCollected.toLocaleString()}</td>
@@ -205,6 +215,11 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
                             {city.name}
                           </td>
                           <td className="px-6 py-2 text-left font-mono text-[10px] text-gray-300">{city.jurisdictionCode || '-'}</td>
+                          <td className="px-6 py-2 text-center">
+                            <span className="text-[10px] font-medium text-gray-400">
+                              {city.taxRate ? `${city.taxRate}%` : '-'}
+                            </span>
+                          </td>
                           <td className="px-6 py-2 text-right text-gray-500 text-sm">${city.grossSales.toLocaleString()}</td>
                           <td className="px-6 py-2 text-right text-gray-500 text-sm">${city.taxableSales.toLocaleString()}</td>
                           <td className="px-6 py-2 text-right text-gray-500 text-sm">${city.taxCollected.toLocaleString()}</td>
@@ -218,7 +233,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
             </tbody>
             <tfoot className="bg-blue-50/30">
               <tr className="font-bold">
-                <td colSpan={2} className="px-6 py-6 text-gray-900">GRAND TOTAL</td>
+                <td colSpan={3} className="px-6 py-6 text-gray-900">GRAND TOTAL</td>
                 <td className="px-6 py-6 text-right">${report.totalGrossSales.toLocaleString()}</td>
                 <td className="px-6 py-6 text-right">${report.totalTaxableSales.toLocaleString()}</td>
                 <td className="px-6 py-6 text-right text-blue-700 font-extrabold text-lg">${report.totalTaxCollected.toLocaleString()}</td>

@@ -4,6 +4,10 @@ import { TaxReport, StateSummary, CountySummary, JurisdictionSummary } from "../
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+/**
+ * Processes sales data using Gemini 3 Flash for high-speed analysis (30-60s target).
+ * Flash is optimized for lower latency while maintaining reasoning for jurisdiction inference.
+ */
 export async function processSalesData(
   data: string, 
   mimeType: string = 'text/plain'
@@ -16,33 +20,30 @@ export async function processSalesData(
     : { text: data };
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3-flash-preview", 
     contents: {
       parts: [
         {
-          text: `You are a World-Class Sales Tax Compliance Expert. 
+          text: `You are a High-Speed Sales Tax Compliance Engine. 
           
-          CORE COMPETENCY:
-          - You know every US State, County, and Local Tax Jurisdiction.
-          - You understand the 'Shipping region' mapping for Shopify/Amazon reports.
-          - You possess an internal database of Jurisdiction Codes (e.g., SST codes, State-specific IDs like CA's 3-digit codes, TX Local Codes).
-
-          CRITICAL TASK - DATA ENRICHMENT:
-          1. INFER MISSING COUNTIES: If the uploaded data lacks a 'County' or 'Jurisdiction' column, you MUST automatically determine the correct County based on the 'City', 'State', and 'Zip' provided. DO NOT leave the county field blank or 'Unknown'.
-          2. JURISDICTION CODES: For every level (State, County, City), identify and include the official Filing Jurisdiction Code. This is vital for the user to file on state portals.
+          TASK: 
+          Rapidly analyze the provided sales dataset and return a structured JSON tax report.
           
-          DATA MAPPING:
-          - "Shipping region" / "Province" => State
-          - "Shipping city" / "City" => City
-          - "Net sales" / "Total" => Taxable & Gross Sales
-          - "Taxes" / "Tax collected" => Tax Collected
+          ENRICHMENT RULES:
+          1. INFER MISSING COUNTIES: Using the City/State/Zip provided, automatically determine the correct County. 
+          2. JURISDICTION CODES: Include official Filing Jurisdiction Codes for every level.
+          3. TAX RATES: For every level (State, County, City), identify and include the applicable nominal or effective tax rate as a percentage (e.g., 8.25).
+          4. HEADERS: Map common e-commerce headers:
+             - "Shipping region", "Province", "State" -> State
+             - "Shipping city", "City" -> City
+             - "Net sales", "Item Price", "Amount" -> Taxable & Gross Sales
+             - "Taxes", "Tax collected", "Sales Tax" -> Tax Collected
           
-          OUTPUT STRUCTURE:
-          - Aggregate all sales.
-          - State > County > City hierarchy.
-          - Ensure math is perfect: State Total = Sum of Counties = Sum of Cities.
+          AGGREGATION:
+          Summarize data at State > County > City levels.
+          State Total = Sum(Counties) = Sum(Cities).
           
-          Return ONLY a clean JSON object following the provided schema.`
+          OUTPUT: Return ONLY a clean JSON object following the schema provided. No preamble.`
         },
         part
       ]
@@ -65,6 +66,7 @@ export async function processSalesData(
                 stateCode: { type: Type.STRING },
                 name: { type: Type.STRING },
                 jurisdictionCode: { type: Type.STRING },
+                taxRate: { type: Type.NUMBER },
                 grossSales: { type: Type.NUMBER },
                 taxableSales: { type: Type.NUMBER },
                 taxCollected: { type: Type.NUMBER },
@@ -76,6 +78,7 @@ export async function processSalesData(
                     properties: {
                       name: { type: Type.STRING },
                       jurisdictionCode: { type: Type.STRING },
+                      taxRate: { type: Type.NUMBER },
                       grossSales: { type: Type.NUMBER },
                       taxableSales: { type: Type.NUMBER },
                       taxCollected: { type: Type.NUMBER },
@@ -87,6 +90,7 @@ export async function processSalesData(
                           properties: {
                             name: { type: Type.STRING },
                             jurisdictionCode: { type: Type.STRING },
+                            taxRate: { type: Type.NUMBER },
                             grossSales: { type: Type.NUMBER },
                             taxableSales: { type: Type.NUMBER },
                             taxCollected: { type: Type.NUMBER },
@@ -131,6 +135,7 @@ export async function processSalesData(
         const stateSummary: StateSummary = {
           name: s.name,
           jurisdictionCode: s.jurisdictionCode,
+          taxRate: s.taxRate,
           grossSales: s.grossSales,
           taxableSales: s.taxableSales,
           taxCollected: s.taxCollected,
@@ -143,6 +148,7 @@ export async function processSalesData(
             const countySummary: CountySummary = {
               name: co.name,
               jurisdictionCode: co.jurisdictionCode,
+              taxRate: co.taxRate,
               grossSales: co.grossSales,
               taxableSales: co.taxableSales,
               taxCollected: co.taxCollected,
@@ -155,6 +161,7 @@ export async function processSalesData(
                 countySummary.cities[ci.name] = {
                   name: ci.name,
                   jurisdictionCode: ci.jurisdictionCode,
+                  taxRate: ci.taxRate,
                   grossSales: ci.grossSales,
                   taxableSales: ci.taxableSales,
                   taxCollected: ci.taxCollected,
@@ -172,11 +179,13 @@ export async function processSalesData(
     return transformedReport;
   } catch (err) {
     console.error("Gemini Response parsing error:", err, response.text);
-    throw new Error("Tax Audit Failed. The report structure was invalid. Please ensure headers like 'Shipping City' and 'Gross Sales' are present.");
+    throw new Error("High-speed sync failed. Ensure your file headers are clear and recognizable.");
   }
 }
 
-export const MOCK_SALES_CSV = `Shipping region,Shipping city,Shipping country,Taxes,Net sales
-California,Chula Vista,United States,4.83,234.97
-South Carolina,Blythewood,United States,4.45,55.5
-Michigan,Auburn Hills,United States,3.39,56.56`;
+export const MOCK_SALES_CSV = `Shipping region,Shipping city,Zip,Taxes,Net sales
+California,Los Angeles,90001,45.50,500.00
+California,Santa Monica,90401,12.20,145.00
+Texas,Houston,77001,34.00,412.50
+New York,Brooklyn,11201,18.75,210.00
+Florida,Miami,33101,0.00,100.00`;

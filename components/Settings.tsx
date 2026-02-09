@@ -23,6 +23,14 @@ const Settings: React.FC = () => {
     setActiveNexus(newSet);
   };
 
+  const activateAll = () => {
+    setActiveNexus(new Set(US_STATES));
+  };
+
+  const deactivateAll = () => {
+    setActiveNexus(new Set());
+  };
+
   const filteredStates = useMemo(() => {
     return US_STATES.filter(state => state.toLowerCase().includes(search.toLowerCase()));
   }, [search]);
@@ -43,11 +51,27 @@ const Settings: React.FC = () => {
       
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-8 border-b border-gray-100">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex-1">
               <h3 className="text-xl font-bold text-gray-900 mb-1">State Nexus Jurisdictions</h3>
-              <p className="text-sm text-gray-500">Enable states where you meet physical or economic nexus thresholds.</p>
+              <p className="text-sm text-gray-500 mb-4">Enable states where you meet physical or economic nexus thresholds.</p>
+              
+              <div className="flex items-center space-x-3 mt-2">
+                <button 
+                  onClick={activateAll}
+                  className="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg hover:bg-blue-100 transition border border-blue-100"
+                >
+                  <i className="fas fa-check-double mr-2"></i> Activate All States
+                </button>
+                <button 
+                  onClick={deactivateAll}
+                  className="px-4 py-2 bg-gray-50 text-gray-600 text-xs font-bold rounded-lg hover:bg-gray-100 transition border border-gray-200"
+                >
+                  <i className="fas fa-times mr-2"></i> Deactivate All
+                </button>
+              </div>
             </div>
+            
             <div className="relative w-full md:w-72">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <i className="fas fa-search text-gray-400"></i>

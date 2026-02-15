@@ -5,8 +5,8 @@ import { TaxReport, StateSummary, CountySummary, JurisdictionSummary } from "../
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * Processes sales data using Gemini 3 Flash for high-speed analysis (30-60s target).
- * Flash is optimized for lower latency while maintaining reasoning for jurisdiction inference.
+ * Processes sales data using Gemini 3 Flash.
+ * Optimized for precise geographic auditing and high-volume data sets.
  */
 export async function processSalesData(
   data: string, 
@@ -24,31 +24,39 @@ export async function processSalesData(
     contents: {
       parts: [
         {
-          text: `You are a High-Speed Sales Tax Compliance Engine. 
+          text: `You are the Expert Sales Tax Compliance Auditor and Geographic Specialist. 
           
+          CRITICAL GEOGRAPHIC MAPPING RULES:
+          1. CITY-TO-COUNTY PRECISION: 
+             - For every "Row Label" (City) and "State", you MUST identify the correct County.
+             - Example: "Atlanta, GA" MUST be mapped to "Fulton" or "DeKalb" (Audit and assign the most appropriate). "Alpharetta, GA" MUST be "Fulton".
+             - DO NOT leave County as "Unknown". Use your internal database of US jurisdictions.
+          
+          2. 2024/2025 TAX RATE CALCULATION:
+             - Use the most current combined sales tax rates as of today (State + County + Local/City).
+             - "Expected Tax" = Taxable Sales * (Correct 2024/2025 Combined Rate / 100).
+             - Highlight the difference between "Tax Collected" (from the file) and this "Expected Tax" in the "variance" field.
+
+          3. ACCOUNTING NOTATION & CLEANING: 
+             - Treat "(X.XX)" as -X.XX.
+             - Treat "-" as 0.
+             - Normalize all strings: "POOLER" -> "Pooler", "Dacu;a" -> "Dacula".
+
+          4. FULL AUDIT INTEGRITY:
+             - Process EVERY single row in the input. 
+             - Use "Grand Total" lines to cross-check that your internal sums match the user's report exactly.
+             - Ensure every City is nested under its correct County in the JSON structure.
+
           TASK: 
-          Rapidly analyze the provided sales dataset and return a structured JSON tax report.
-          
-          ENRICHMENT RULES:
-          1. INFER MISSING COUNTIES: Using the City/State/Zip provided, automatically determine the correct County. 
-          2. JURISDICTION CODES: Include official Filing Jurisdiction Codes for every level.
-          3. TAX RATES: For every level (State, County, City), identify and include the applicable nominal or effective tax rate as a percentage (e.g., 8.25).
-          4. HEADERS: Map common e-commerce headers:
-             - "Shipping region", "Province", "State" -> State
-             - "Shipping city", "City" -> City
-             - "Net sales", "Item Price", "Amount" -> Taxable & Gross Sales
-             - "Taxes", "Tax collected", "Sales Tax" -> Tax Collected
-          
-          AGGREGATION:
-          Summarize data at State > County > City levels.
-          State Total = Sum(Counties) = Sum(Cities).
-          
-          OUTPUT: Return ONLY a clean JSON object following the schema provided. No preamble.`
+          Convert the raw data into a structured JSON tax report. Accuracy is non-negotiable for filing purposes.
+
+          OUTPUT: Return ONLY a clean JSON object.`
         },
         part
       ]
     },
     config: {
+      thinkingConfig: { thinkingBudget: 18000 }, // Maximize reasoning for geographic lookups and math
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -56,59 +64,63 @@ export async function processSalesData(
           totalGrossSales: { type: Type.NUMBER },
           totalTaxableSales: { type: Type.NUMBER },
           totalTaxCollected: { type: Type.NUMBER },
+          totalExpectedTax: { type: Type.NUMBER },
           totalTaxLiability: { type: Type.NUMBER },
+          totalVariance: { type: Type.NUMBER },
           period: { type: Type.STRING },
           states: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
-                stateCode: { type: Type.STRING },
                 name: { type: Type.STRING },
-                jurisdictionCode: { type: Type.STRING },
                 taxRate: { type: Type.NUMBER },
                 grossSales: { type: Type.NUMBER },
                 taxableSales: { type: Type.NUMBER },
                 taxCollected: { type: Type.NUMBER },
+                expectedTax: { type: Type.NUMBER },
                 taxLiability: { type: Type.NUMBER },
+                variance: { type: Type.NUMBER },
                 counties: {
                   type: Type.ARRAY,
                   items: {
                     type: Type.OBJECT,
                     properties: {
                       name: { type: Type.STRING },
-                      jurisdictionCode: { type: Type.STRING },
                       taxRate: { type: Type.NUMBER },
                       grossSales: { type: Type.NUMBER },
                       taxableSales: { type: Type.NUMBER },
                       taxCollected: { type: Type.NUMBER },
+                      expectedTax: { type: Type.NUMBER },
                       taxLiability: { type: Type.NUMBER },
+                      variance: { type: Type.NUMBER },
                       cities: {
                         type: Type.ARRAY,
                         items: {
                           type: Type.OBJECT,
                           properties: {
                             name: { type: Type.STRING },
-                            jurisdictionCode: { type: Type.STRING },
                             taxRate: { type: Type.NUMBER },
                             grossSales: { type: Type.NUMBER },
                             taxableSales: { type: Type.NUMBER },
                             taxCollected: { type: Type.NUMBER },
+                            expectedTax: { type: Type.NUMBER },
                             taxLiability: { type: Type.NUMBER },
+                            variance: { type: Type.NUMBER },
                           },
-                          required: ["name", "grossSales", "taxableSales", "taxCollected", "taxLiability"]
+                          required: ["name", "taxRate", "grossSales", "taxableSales", "taxCollected", "expectedTax", "variance"]
                         }
                       }
                     },
-                    required: ["name", "grossSales", "taxableSales", "taxCollected", "taxLiability", "cities"]
+                    required: ["name", "grossSales", "taxableSales", "taxCollected", "expectedTax", "cities"]
                   }
                 }
               },
-              required: ["stateCode", "name", "grossSales", "taxableSales", "taxCollected", "taxLiability", "counties"]
+              required: ["name", "grossSales", "taxableSales", "taxCollected", "expectedTax", "counties"]
             }
           }
         },
-        required: ["totalGrossSales", "totalTaxableSales", "totalTaxCollected", "totalTaxLiability", "states"]
+        required: ["totalGrossSales", "totalTaxableSales", "totalTaxCollected", "totalExpectedTax", "states"]
       }
     }
   });
@@ -116,7 +128,7 @@ export async function processSalesData(
   try {
     const text = response.text;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Invalid AI Response Format");
+    if (!jsonMatch) throw new Error("Could not parse AI response as JSON.");
     
     const rawData = JSON.parse(jsonMatch[0]);
     
@@ -124,22 +136,24 @@ export async function processSalesData(
       totalGrossSales: rawData.totalGrossSales,
       totalTaxableSales: rawData.totalTaxableSales,
       totalTaxCollected: rawData.totalTaxCollected,
-      totalTaxLiability: rawData.totalTaxLiability,
-      period: rawData.period || "Consolidated Report",
+      totalExpectedTax: rawData.totalExpectedTax,
+      totalTaxLiability: rawData.totalTaxLiability || rawData.totalExpectedTax,
+      totalVariance: rawData.totalVariance || (rawData.totalExpectedTax - rawData.totalTaxCollected),
+      period: rawData.period || "Consolidated Audit Report",
       states: {}
     };
 
     if (Array.isArray(rawData.states)) {
       rawData.states.forEach((s: any) => {
-        const stateKey = s.stateCode || s.name;
         const stateSummary: StateSummary = {
           name: s.name,
-          jurisdictionCode: s.jurisdictionCode,
           taxRate: s.taxRate,
           grossSales: s.grossSales,
           taxableSales: s.taxableSales,
           taxCollected: s.taxCollected,
-          taxLiability: s.taxLiability,
+          expectedTax: s.expectedTax,
+          taxLiability: s.taxLiability || s.expectedTax,
+          variance: s.variance || (s.expectedTax - s.taxCollected),
           counties: {}
         };
 
@@ -147,12 +161,13 @@ export async function processSalesData(
           s.counties.forEach((co: any) => {
             const countySummary: CountySummary = {
               name: co.name,
-              jurisdictionCode: co.jurisdictionCode,
               taxRate: co.taxRate,
               grossSales: co.grossSales,
               taxableSales: co.taxableSales,
               taxCollected: co.taxCollected,
-              taxLiability: co.taxLiability,
+              expectedTax: co.expectedTax,
+              taxLiability: co.taxLiability || co.expectedTax,
+              variance: co.variance || (co.expectedTax - co.taxCollected),
               cities: {}
             };
 
@@ -160,32 +175,32 @@ export async function processSalesData(
               co.cities.forEach((ci: any) => {
                 countySummary.cities[ci.name] = {
                   name: ci.name,
-                  jurisdictionCode: ci.jurisdictionCode,
                   taxRate: ci.taxRate,
                   grossSales: ci.grossSales,
                   taxableSales: ci.taxableSales,
                   taxCollected: ci.taxCollected,
-                  taxLiability: ci.taxLiability
+                  expectedTax: ci.expectedTax,
+                  taxLiability: ci.taxLiability || ci.expectedTax,
+                  variance: ci.variance || (ci.expectedTax - ci.taxCollected)
                 };
               });
             }
             stateSummary.counties[co.name] = countySummary;
           });
         }
-        transformedReport.states[stateKey] = stateSummary;
+        transformedReport.states[s.name] = stateSummary;
       });
     }
 
     return transformedReport;
   } catch (err) {
-    console.error("Gemini Response parsing error:", err, response.text);
-    throw new Error("High-speed sync failed. Ensure your file headers are clear and recognizable.");
+    console.error("Gemini Error:", err, response.text);
+    throw new Error("Tax Engine reached a parsing conflict. Please ensure your file headers are legible and valid.");
   }
 }
 
-export const MOCK_SALES_CSV = `Shipping region,Shipping city,Zip,Taxes,Net sales
-California,Los Angeles,90001,45.50,500.00
-California,Santa Monica,90401,12.20,145.00
-Texas,Houston,77001,34.00,412.50
-New York,Brooklyn,11201,18.75,210.00
-Florida,Miami,33101,0.00,100.00`;
+export const MOCK_SALES_CSV = `State,Row Labels, Sum of Gross sales , Sum of Discounts , Sum of Discounts returned , Sum of Gift card discounts , Sum of Taxes returned , Sum of Net sales , Sum of Taxes 
+Georgia,Acworth, 59.950 , -   , -   , -   , -   , 59.950 , -   
+Georgia,Albany, 59.950 , -   , -   , -   , -   , 59.950 , -   
+Georgia,Alpharetta, 359.700 , (58.980), -   , -   , -   , 300.720 , -   
+,Grand Total," 9,741.850 ", (481.460), 11.990 , -   , -   ," 8,818.970 ", -   `;

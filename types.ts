@@ -16,9 +16,11 @@ export interface JurisdictionSummary {
   grossSales: number;
   taxableSales: number;
   taxCollected: number;
-  taxLiability: number; // calculated
-  jurisdictionCode?: string; // Added for official tax filing codes
-  taxRate?: number; // Added for granular tax rate reporting
+  expectedTax: number; // Calculated: Taxable Sales * Tax Rate
+  taxLiability: number; // Final amount due/owed
+  variance: number; // Expected Tax - Tax Collected
+  jurisdictionCode?: string;
+  taxRate?: number; // Nominal percentage (e.g., 8.25)
 }
 
 export interface StateSummary extends JurisdictionSummary {
@@ -33,7 +35,9 @@ export interface TaxReport {
   totalGrossSales: number;
   totalTaxableSales: number;
   totalTaxCollected: number;
+  totalExpectedTax: number;
   totalTaxLiability: number;
+  totalVariance: number;
   states: Record<string, StateSummary>;
   period: string;
 }
